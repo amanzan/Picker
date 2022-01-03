@@ -7,7 +7,8 @@ class PickerOptions : Serializable{
     var maxCount = 10
     var allowFrontCamera = true
     var excludeVideos = false
-    var maxVideoDuration = 30
+    var excludeImages = false
+    var maxVideoDuration = 15
     var preSelectedMediaList = ArrayList<String>()
 
     companion object{

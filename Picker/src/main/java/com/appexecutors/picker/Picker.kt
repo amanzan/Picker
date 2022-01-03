@@ -515,7 +515,7 @@ class Picker : AppCompatActivity() {
 
         CoroutineScope(Dispatchers.Main).launch {
             val cursor: Cursor? = withContext(Dispatchers.IO) {
-                getImageVideoCursor(this@Picker, mPickerOptions.excludeVideos)
+                getImageVideoCursor(this@Picker, mPickerOptions)
             }
 
             if (cursor != null) {

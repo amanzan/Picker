@@ -34,17 +34,25 @@ object MediaConstants {
     private var IMAGE_SELECTION = (MediaStore.Files.FileColumns.MEDIA_TYPE + "="
             + MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE)
 
+    private var VIDEO_SELECTION = (MediaStore.Files.FileColumns.MEDIA_TYPE + "="
+            + MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO)
+
     private var IMAGE_VIDEO_ORDER_BY = MediaStore.Images.Media.DATE_MODIFIED + " DESC"
 
     fun getImageVideoCursor(
         context: Context,
-        excludeVideo: Boolean
+        options: PickerOptions
     ): Cursor? {
+        val selection = when {
+            options.excludeVideos -> IMAGE_SELECTION
+            options.excludeImages -> VIDEO_SELECTION
+            else -> IMAGE_VIDEO_SELECTION
+        }
         return context.contentResolver
             .query(
                 IMAGE_VIDEO_URI,
                 IMAGE_VIDEO_PROJECTION,
-                if (excludeVideo)IMAGE_SELECTION else IMAGE_VIDEO_SELECTION,
+                selection,
                 null,
                 IMAGE_VIDEO_ORDER_BY
             )
