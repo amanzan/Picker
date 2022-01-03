@@ -8,14 +8,13 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import android.widget.Toast.LENGTH_SHORT
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.RecyclerView
 import com.appexecutors.picker.R
-import com.appexecutors.picker.databinding.RecyclerItemDateHeaderBinding
-import com.appexecutors.picker.databinding.RecyclerItemMediaBinding
 import com.appexecutors.picker.interfaces.MediaClickInterface
 import com.appexecutors.picker.utils.GeneralUtils.getScreenWidth
 import com.appexecutors.picker.utils.HeaderItemDecoration
@@ -65,11 +64,9 @@ class BottomSheetMediaRecyclerAdapter(private val mMediaList: ArrayList<MediaMod
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
         return if (viewType == HEADER){
-            val mBinding = RecyclerItemDateHeaderBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-            HeaderViewHolder(mBinding)
+            HeaderViewHolder(LayoutInflater.from(parent.context).inflate(R.layout.recycler_item_date_header, parent, false))
         }else {
-            val mBinding = RecyclerItemMediaBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-            MediaViewHolder(mBinding)
+            MediaViewHolder(LayoutInflater.from(parent.context).inflate(R.layout.recycler_item_media, parent, false))
         }
     }
 
@@ -85,24 +82,25 @@ class BottomSheetMediaRecyclerAdapter(private val mMediaList: ArrayList<MediaMod
     var imageCount = 0
     var mTapToSelect = false
 
-    inner class MediaViewHolder(private val mBinding: RecyclerItemMediaBinding): RecyclerView.ViewHolder(mBinding.root) {
+    inner class MediaViewHolder(private val itemView: View): RecyclerView.ViewHolder(itemView) {
+        val imageView = itemView.findViewById<ImageView>(R.id.image_view)
+        val imageViewVideo = itemView.findViewById<ImageView>(R.id.image_view_video)
+        val imageViewSelection = itemView.findViewById<ImageView>(R.id.image_view_selection)
 
         fun bind(position: Int){
             val media = mMediaList[position]
-            mBinding.imageView.layoutParams = layoutParams
-
-            Log.e("TAG", "bind: $adapterPosition" )
+            imageView.layoutParams = layoutParams
 
             glide?.load(media.mMediaUri)
                 ?.apply(options)
-                ?.into(mBinding.imageView)
+                ?.into(imageView)
 
-            if (media.mMediaType == MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO) mBinding.imageViewVideo.visibility =
+            if (media.mMediaType == MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO) imageViewVideo.visibility =
                 View.VISIBLE
-            else mBinding.imageViewVideo.visibility = View.GONE
+            else imageViewVideo.visibility = View.GONE
 
-            if (media.isSelected) mBinding.imageViewSelection.visibility = View.VISIBLE
-            else mBinding.imageViewSelection.visibility = View.GONE
+            if (media.isSelected) imageViewSelection.visibility = View.VISIBLE
+            else imageViewSelection.visibility = View.GONE
 
             itemView.setOnClickListener {
                 if (imageCount == 0 && !mTapToSelect) {
@@ -131,10 +129,11 @@ class BottomSheetMediaRecyclerAdapter(private val mMediaList: ArrayList<MediaMod
         }
     }
 
-    inner class HeaderViewHolder(private val mBinding: RecyclerItemDateHeaderBinding): RecyclerView.ViewHolder(mBinding.root) {
+    inner class HeaderViewHolder(private val itemView: View): RecyclerView.ViewHolder(itemView) {
+        val header = itemView.findViewById<TextView>(R.id.header)
 
         fun bind(media: MediaModel){
-            mBinding.header.text = media.mMediaDate
+            header.text = media.mMediaDate
         }
     }
 

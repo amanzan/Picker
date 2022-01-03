@@ -24,20 +24,25 @@ import android.view.View
 import android.view.View.*
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.webkit.MimeTypeMap
+import android.widget.ImageButton
+import android.widget.ImageView
+import android.widget.ProgressBar
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.AppCompatImageView
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.graphics.drawable.DrawableCompat
 import androidx.core.net.toFile
-import androidx.databinding.DataBindingUtil
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.GridLayoutManager.SpanSizeLookup
-import com.appexecutors.picker.databinding.ActivityPickerBinding
+import androidx.recyclerview.widget.RecyclerView
 import com.appexecutors.picker.gallery.BottomSheetMediaRecyclerAdapter
 import com.appexecutors.picker.gallery.BottomSheetMediaRecyclerAdapter.Companion.HEADER
 import com.appexecutors.picker.gallery.BottomSheetMediaRecyclerAdapter.Companion.SPAN_COUNT
@@ -72,8 +77,6 @@ import kotlin.math.min
 @Suppress("DEPRECATION")
 class Picker : AppCompatActivity() {
 
-    private lateinit var mBinding: ActivityPickerBinding
-
     private var lensFacing: Int = CameraSelector.LENS_FACING_BACK
     private var preview: Preview? = null
     private var imageCapture: ImageCapture? = null
@@ -86,14 +89,38 @@ class Picker : AppCompatActivity() {
     private lateinit var outputDirectory: File
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var mPickerOptions: PickerOptions
+    private lateinit var imageViewChangeCamera: ImageView
+    private lateinit var viewFinder: PreviewView
+    private lateinit var imageViewClick: ImageButton
+    private lateinit var imageViewFlash: ImageView
+    private lateinit var constraintCheck: ConstraintLayout
+    private lateinit var textViewOk: TextView
+    private lateinit var imageViewCheck: ImageView
+    private lateinit var constraintBottomSheetTop: ConstraintLayout
+    private lateinit var imageViewBack: ImageView
+    private lateinit var textViewImageCount: TextView
+    private lateinit var textViewTopSelect: TextView
+    private lateinit var recyclerViewInstantMedia: RecyclerView
+    private lateinit var recyclerViewBottomSheetMedia: RecyclerView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        mBinding = DataBindingUtil.setContentView(this, R.layout.activity_picker)
+        setContentView(R.layout.activity_picker)
 
         mPickerOptions = intent?.getSerializableExtra(PICKER_OPTIONS) as PickerOptions
 
-        mBinding.viewFinder.post {
+        constraintCheck = findViewById(R.id.constraint_check)
+        textViewOk = findViewById(R.id.text_view_ok)
+        imageViewCheck = findViewById(R.id.image_view_check)
+        constraintBottomSheetTop = findViewById(R.id.constraint_bottom_sheet_top)
+        imageViewBack = findViewById(R.id.image_view_back)
+        textViewImageCount = findViewById(R.id.text_view_image_count)
+        textViewTopSelect = findViewById(R.id.text_view_top_select)
+        recyclerViewInstantMedia = findViewById(R.id.recycler_view_instant_media)
+        recyclerViewBottomSheetMedia = findViewById<RecyclerView>(R.id.recycler_view_bottom_sheet_media)
+
+        viewFinder = findViewById(R.id.viewFinder)
+        viewFinder.post {
             if (allPermissionsGranted()) {
                 //to avoid NullPointerException for Display.getRealMetrics which comes for some cases
                 Handler().postDelayed({ startCamera() }, 100)
@@ -101,7 +128,8 @@ class Picker : AppCompatActivity() {
         }
 
         // Setup the listener for take photo button
-        mBinding.imageViewClick.setOnClickListener { takePhoto() }
+        imageViewClick = findViewById(R.id.image_view_click)
+        imageViewClick.setOnClickListener { takePhoto() }
 
         outputDirectory = getOutputDirectory()
 
@@ -140,9 +168,8 @@ class Picker : AppCompatActivity() {
 
     @SuppressLint("ClickableViewAccessibility")
     private fun initViews(){
-
-        mBinding.imageViewChangeCamera.let {
-
+        imageViewChangeCamera = findViewById(R.id.image_view_change_camera)
+        imageViewChangeCamera.let {
             it.setOnClickListener {
                 lensFacing = if (CameraSelector.LENS_FACING_FRONT == lensFacing) {
                     CameraSelector.LENS_FACING_BACK
@@ -156,8 +183,8 @@ class Picker : AppCompatActivity() {
             }
         }
 
-        if (!mPickerOptions.allowFrontCamera) mBinding.imageViewChangeCamera.visibility = GONE
-        if (mPickerOptions.excludeVideos) mBinding.textViewMessageBottom.visibility = INVISIBLE
+        if (!mPickerOptions.allowFrontCamera) imageViewChangeCamera.visibility = GONE
+        if (mPickerOptions.excludeVideos) imageViewChangeCamera.visibility = INVISIBLE
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -171,8 +198,9 @@ class Picker : AppCompatActivity() {
             }
         }
         val scaleGestureDetector = ScaleGestureDetector(this, listener)
-        mBinding.viewFinder.setOnTouchListener { _, event ->
-            mBinding.viewFinder.post {
+
+        viewFinder.setOnTouchListener { _, event ->
+            viewFinder.post {
                 scaleGestureDetector.onTouchEvent(event)
             }
             return@setOnTouchListener true
@@ -182,7 +210,8 @@ class Picker : AppCompatActivity() {
     private fun setupFlash() {
 
         flashMode = ImageCapture.FLASH_MODE_OFF
-        mBinding.imageViewFlash.setImageDrawable(
+        imageViewFlash = findViewById(R.id.image_view_flash)
+        imageViewFlash.setImageDrawable(
             ResourcesCompat.getDrawable(
                 resources, R.drawable.ic_baseline_flash_off_36, null
             )
@@ -190,13 +219,13 @@ class Picker : AppCompatActivity() {
 
         val hasFlash = camera?.cameraInfo?.hasFlashUnit()
 
-        if (hasFlash != null && hasFlash) mBinding.imageViewFlash.visibility = VISIBLE
-        else mBinding.imageViewFlash.visibility = GONE
+        if (hasFlash != null && hasFlash) imageViewFlash.visibility = VISIBLE
+        else imageViewFlash.visibility = GONE
 
-        mBinding.imageViewFlash.setOnClickListener {
+        imageViewFlash.setOnClickListener {
             when (flashMode) {
                 ImageCapture.FLASH_MODE_OFF -> {
-                    mBinding.imageViewFlash.setImageDrawable(
+                    imageViewFlash.setImageDrawable(
                         ResourcesCompat.getDrawable(
                             resources, R.drawable.ic_baseline_flash_on_36, null
                         )
@@ -205,7 +234,7 @@ class Picker : AppCompatActivity() {
                     flashMode = ImageCapture.FLASH_MODE_ON
                 }
                 ImageCapture.FLASH_MODE_ON -> {
-                    mBinding.imageViewFlash.setImageDrawable(
+                    imageViewFlash.setImageDrawable(
                         ResourcesCompat.getDrawable(
                             resources, R.drawable.ic_baseline_flash_off_36, null
                         )
@@ -223,13 +252,13 @@ class Picker : AppCompatActivity() {
     private fun bindCameraUseCases() {
 
         // Get screen metrics used to setup camera for full screen resolution
-        val metrics = DisplayMetrics().also { mBinding.viewFinder.display.getRealMetrics(it) }
+        val metrics = DisplayMetrics().also { viewFinder.display.getRealMetrics(it) }
         Log.d(TAG, "Screen metrics: ${metrics.widthPixels} x ${metrics.heightPixels}")
 
         val screenAspectRatio = aspectRatio(metrics.widthPixels, metrics.heightPixels)
         Log.d(TAG, "Preview aspect ratio: $screenAspectRatio")
 
-        val rotation = mBinding.viewFinder.display.rotation
+        val rotation = viewFinder.display.rotation
 
         // CameraProvider
         val cameraProvider = cameraProvider
@@ -270,7 +299,7 @@ class Picker : AppCompatActivity() {
             )
 
             // Attach the viewfinder's surface provider to preview use case
-            preview?.setSurfaceProvider(mBinding.viewFinder.surfaceProvider)
+            preview?.setSurfaceProvider(viewFinder.surfaceProvider)
         } catch (exc: Exception) {
             Log.e(TAG, "Use case binding failed", exc)
         }
@@ -340,12 +369,12 @@ class Picker : AppCompatActivity() {
 
             // We can only change the foreground Drawable using API level 23+ API
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-
+                val container = findViewById<ConstraintLayout>(R.id.container)
                 // Display flash animation to indicate that photo was captured
-                mBinding.container.postDelayed({
-                    mBinding.container.foreground = ColorDrawable(Color.WHITE)
-                    mBinding.container.postDelayed(
-                        { mBinding.container.foreground = null }, ANIMATION_FAST_MILLIS
+                container.postDelayed({
+                    container.foreground = ColorDrawable(Color.WHITE)
+                    container.postDelayed(
+                        { container.foreground = null }, ANIMATION_FAST_MILLIS
                     )
                 }, ANIMATION_SLOW_MILLIS)
             }
@@ -356,19 +385,21 @@ class Picker : AppCompatActivity() {
 
     @SuppressLint("ClickableViewAccessibility", "RestrictedApi")
     private fun videoTouchListener() {
+        val imageViewVideoRedBg = findViewById<ImageView>(R.id.image_view_video_red_bg)
 
-        mBinding.imageViewClick.setOnTouchListener { _, event ->
+        imageViewClick.setOnTouchListener { _, event ->
             if (event.action == MotionEvent.ACTION_UP) {
-                mBinding.imageViewVideoRedBg.visibility = GONE
-                mBinding.imageViewVideoRedBg.animate().scaleX(1f).scaleY(1f)
+                imageViewVideoRedBg.visibility = GONE
+                imageViewVideoRedBg.animate().scaleX(1f).scaleY(1f)
                     .setDuration(300).setInterpolator(AccelerateDecelerateInterpolator()).start()
-                mBinding.imageViewClick.animate().scaleX(1f).scaleY(1f).setDuration(300)
+
+                imageViewClick.animate().scaleX(1f).scaleY(1f).setDuration(300)
                     .setInterpolator(AccelerateDecelerateInterpolator()).start()
             } else if (event.action == MotionEvent.ACTION_DOWN) {
-                mBinding.imageViewVideoRedBg.visibility = VISIBLE
-                mBinding.imageViewVideoRedBg.animate().scaleX(1.2f).scaleY(1.2f)
+                imageViewVideoRedBg.visibility = VISIBLE
+                imageViewVideoRedBg.animate().scaleX(1.2f).scaleY(1.2f)
                     .setDuration(300).setInterpolator(AccelerateDecelerateInterpolator()).start()
-                mBinding.imageViewClick.animate().scaleX(1.2f).scaleY(1.2f).setDuration(300)
+                imageViewClick.animate().scaleX(1.2f).scaleY(1.2f).setDuration(300)
                     .setInterpolator(AccelerateDecelerateInterpolator()).start()
             }
             if (event.action == MotionEvent.ACTION_UP && isTakingVideo) {
@@ -379,7 +410,7 @@ class Picker : AppCompatActivity() {
             false
         }
 
-        mBinding.imageViewClick.setOnLongClickListener {
+        imageViewClick.setOnLongClickListener {
             if (!mPickerOptions.excludeVideos) {
                 try{
                     takeVideo(it)
@@ -410,16 +441,20 @@ class Picker : AppCompatActivity() {
         isTakingVideo = true
         it.performHapticFeedback(LONG_PRESS)
 
-        mBinding.constraintTimer.visibility = VISIBLE
+        findViewById<ConstraintLayout>(R.id.constraint_timer).visibility = VISIBLE
 
-        mBinding.progressbarVideoCounter.progress = 0
+        val progressbarVideoCounter = findViewById<ProgressBar>(R.id.progressbar_video_counter)
 
-        mBinding.progressbarVideoCounter.max = mPickerOptions.maxVideoDuration
-        mBinding.progressbarVideoCounter.invalidate()
+        progressbarVideoCounter.progress = 0
+
+        progressbarVideoCounter.max = mPickerOptions.maxVideoDuration
+        progressbarVideoCounter.invalidate()
+
+        val textViewVideoTimer = findViewById<TextView>(R.id.text_view_video_timer)
 
         mVideoCounterRunnable = Runnable {
             ++mVideoCounterProgress
-            mBinding.progressbarVideoCounter.progress = mVideoCounterProgress
+            progressbarVideoCounter.progress = mVideoCounterProgress
 
             var min = 0
 
@@ -434,7 +469,7 @@ class Picker : AppCompatActivity() {
 
             val time = "0$min:$secondBuilder"
 
-            mBinding.textViewVideoTimer.text = time
+            textViewVideoTimer.text = time
 
             if (mVideoCounterProgress == (mPickerOptions.maxVideoDuration)) {
                 mVideoCounterHandler?.removeCallbacks(mVideoCounterRunnable)
@@ -447,12 +482,12 @@ class Picker : AppCompatActivity() {
 
         mVideoCounterHandler?.postDelayed(mVideoCounterRunnable, 1000)
 
-        mBinding.imageViewClick.animate().scaleX(1.2f).scaleY(1.2f).setDuration(300)
+        imageViewClick.animate().scaleX(1.2f).scaleY(1.2f).setDuration(300)
             .setInterpolator(AccelerateDecelerateInterpolator()).start()
 
-        mBinding.imageViewFlash.visibility = GONE
-        mBinding.imageViewChangeCamera.visibility = GONE
-        mBinding.textViewMessageBottom.visibility = GONE
+        imageViewFlash.visibility = GONE
+        imageViewChangeCamera.visibility = GONE
+        findViewById<TextView>(R.id.text_view_message_bottom).visibility = GONE
 
         //start video
         videoCapture?.startRecording(
@@ -558,7 +593,7 @@ class Picker : AppCompatActivity() {
                 mInstantMediaAdapter =
                     InstantMediaRecyclerAdapter(galleryImageList, mMediaClickListener, this@Picker)
                 mInstantMediaAdapter?.maxCount = mPickerOptions.maxCount
-                mBinding.recyclerViewInstantMedia.adapter = mInstantMediaAdapter
+                recyclerViewInstantMedia.adapter = mInstantMediaAdapter
 
                 for (i in 0 until selectedList.size) {
                     mInstantMediaAdapter?.imageCount = mInstantMediaAdapter?.imageCount!! + 1
@@ -580,11 +615,10 @@ class Picker : AppCompatActivity() {
         }
 
         override fun onMediaLongClick(media: MediaModel, intentFrom: String) {
-
             if (intentFrom == InstantMediaRecyclerAdapter::class.java.simpleName) {
                 if (mInstantMediaAdapter?.imageCount!! > 0) {
-                    mBinding.textViewImageCount.text = mInstantMediaAdapter?.imageCount?.toString()
-                    mBinding.textViewTopSelect.text = String.format(
+                    textViewImageCount.text = mInstantMediaAdapter?.imageCount?.toString()
+                    textViewTopSelect.text = String.format(
                         getString(R.string.images_selected),
                         mInstantMediaAdapter?.imageCount?.toString()
                     )
@@ -595,8 +629,8 @@ class Picker : AppCompatActivity() {
 
             if (intentFrom == BottomSheetMediaRecyclerAdapter::class.java.simpleName) {
                 if (mBottomMediaAdapter?.imageCount!! > 0) {
-                    mBinding.textViewImageCount.text = mBottomMediaAdapter?.imageCount?.toString()
-                    mBinding.textViewTopSelect.text = String.format(
+                    textViewImageCount.text = mBottomMediaAdapter?.imageCount?.toString()
+                    textViewTopSelect.text = String.format(
                         getString(R.string.images_selected),
                         mBottomMediaAdapter?.imageCount?.toString()
                     )
@@ -609,49 +643,49 @@ class Picker : AppCompatActivity() {
     }
 
     private fun showTopViews() {
-        mBinding.constraintCheck.visibility = VISIBLE
-        mBinding.textViewOk.visibility = VISIBLE
+        constraintCheck.visibility = VISIBLE
+        textViewOk.visibility = VISIBLE
 
-        mBinding.imageViewCheck.visibility = GONE
+        imageViewCheck.visibility = GONE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            mBinding.constraintBottomSheetTop.setBackgroundColor(
+            constraintBottomSheetTop.setBackgroundColor(
                 resources.getColor(
                     R.color.colorPrimary,
                     null
                 )
             )
             DrawableCompat.setTint(
-                mBinding.imageViewBack.drawable,
+                imageViewBack.drawable,
                 resources.getColor(R.color.colorWhite, null)
             )
         } else {
-            mBinding.constraintBottomSheetTop.setBackgroundColor(resources.getColor(R.color.colorPrimary))
+            constraintBottomSheetTop.setBackgroundColor(resources.getColor(R.color.colorPrimary))
             DrawableCompat.setTint(
-                mBinding.imageViewBack.drawable,
+                imageViewBack.drawable,
                 resources.getColor(R.color.colorWhite)
             )
         }
     }
 
     private fun hideTopViews() {
-        mBinding.constraintCheck.visibility = GONE
-        mBinding.textViewOk.visibility = GONE
-        mBinding.imageViewCheck.visibility = VISIBLE
+        constraintCheck.visibility = GONE
+        textViewOk.visibility = GONE
+        imageViewCheck.visibility = VISIBLE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            mBinding.constraintBottomSheetTop.setBackgroundColor(
+            constraintBottomSheetTop.setBackgroundColor(
                 resources.getColor(
                     R.color.colorWhite,
                     null
                 )
             )
             DrawableCompat.setTint(
-                mBinding.imageViewBack.drawable,
+                imageViewBack.drawable,
                 resources.getColor(R.color.colorBlack, null)
             )
         } else {
-            mBinding.constraintBottomSheetTop.setBackgroundColor(resources.getColor(R.color.colorWhite))
+            constraintBottomSheetTop.setBackgroundColor(resources.getColor(R.color.colorWhite))
             DrawableCompat.setTint(
-                mBinding.imageViewBack.drawable,
+                imageViewBack.drawable,
                 resources.getColor(R.color.colorBlack)
             )
         }
@@ -666,7 +700,7 @@ class Picker : AppCompatActivity() {
         mBottomMediaAdapter?.maxCount = mPickerOptions.maxCount
 
         val layoutManager = GridLayoutManager(this, SPAN_COUNT)
-        mBinding.recyclerViewBottomSheetMedia.layoutManager = layoutManager
+        recyclerViewBottomSheetMedia.layoutManager = layoutManager
 
         layoutManager.spanSizeLookup = object : SpanSizeLookup() {
             override fun getSpanSize(position: Int): Int {
@@ -676,18 +710,20 @@ class Picker : AppCompatActivity() {
             }
         }
 
-        mBinding.recyclerViewBottomSheetMedia.adapter = mBottomMediaAdapter
-        mBinding.recyclerViewBottomSheetMedia.addItemDecoration(
+        recyclerViewBottomSheetMedia.adapter = mBottomMediaAdapter
+        recyclerViewBottomSheetMedia.addItemDecoration(
             HeaderItemDecoration(
                 mBottomMediaAdapter!!,
                 this
             )
         )
 
-        bottomSheetBehavior = BottomSheetBehavior.from(mBinding.bottomSheet)
+        bottomSheetBehavior = BottomSheetBehavior.from(findViewById(R.id.bottom_sheet))
 
         var notifiedUp = false
         var notifiedDown = false
+
+        val imageViewArrowUp = findViewById<AppCompatImageView>(R.id.image_view_arrow_up)
 
         bottomSheetBehavior?.addBottomSheetCallback(object :
             BottomSheetBehavior.BottomSheetCallback() {
@@ -701,11 +737,11 @@ class Picker : AppCompatActivity() {
                 if (slideOffset == 1f) {
                     notifiedUp = false
                     notifiedDown = false
-                    mBinding.imageViewArrowUp.visibility = INVISIBLE
+                    imageViewArrowUp.visibility = INVISIBLE
                 } else if (slideOffset == 0f) {
                     notifiedUp = false
                     notifiedDown = false
-                    mBinding.imageViewArrowUp.visibility = VISIBLE
+                    imageViewArrowUp.visibility = VISIBLE
                 }
 
                 if (slideOffset > 0.6f && slideOffset < 0.8f) {
@@ -733,7 +769,7 @@ class Picker : AppCompatActivity() {
                             if (mediaModel.isSelected) count++
                         }
                         mInstantMediaAdapter?.imageCount = count
-                        mBinding.textViewImageCount.text = count.toString()
+                        textViewImageCount.text = count.toString()
                     }
 
                 }
@@ -741,7 +777,7 @@ class Picker : AppCompatActivity() {
                 val imageCount =
                     if (mInstantMediaAdapter?.imageCount!! > 0) mInstantMediaAdapter?.imageCount!! else mBottomMediaAdapter?.imageCount!!
 
-                manipulateBottomSheetVisibility(this@Picker, slideOffset, mBinding, imageCount)
+                manipulateBottomSheetVisibility(this@Picker, slideOffset, imageCount, recyclerViewInstantMedia, constraintCheck, constraintBottomSheetTop, recyclerViewBottomSheetMedia)
 
             }
 
@@ -750,36 +786,36 @@ class Picker : AppCompatActivity() {
 
         })
 
-        mBinding.imageViewBack.setOnClickListener {
+        imageViewBack.setOnClickListener {
             bottomSheetBehavior?.setState(BottomSheetBehavior.STATE_COLLAPSED)
         }
 
-        mBinding.constraintCheck.setOnClickListener { pickImages() }
-        mBinding.textViewOk.setOnClickListener { pickImages() }
-        mBinding.imageViewCheck.setOnClickListener {
-            mBinding.constraintCheck.visibility = VISIBLE
-            mBinding.textViewOk.visibility = VISIBLE
+        constraintCheck.setOnClickListener { pickImages() }
+        textViewOk.setOnClickListener { pickImages() }
+        imageViewCheck.setOnClickListener {
+            constraintCheck.visibility = VISIBLE
+            textViewOk.visibility = VISIBLE
 
-            mBinding.textViewTopSelect.text = resources.getString(R.string.tap_to_select)
+            textViewTopSelect.text = resources.getString(R.string.tap_to_select)
 
             mBottomMediaAdapter?.mTapToSelect = true
 
-            mBinding.imageViewCheck.visibility = GONE
+            imageViewCheck.visibility = GONE
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                mBinding.constraintBottomSheetTop.setBackgroundColor(
+                constraintBottomSheetTop.setBackgroundColor(
                     resources.getColor(
                         R.color.colorPrimary,
                         null
                     )
                 )
                 DrawableCompat.setTint(
-                    mBinding.imageViewBack.drawable,
+                    imageViewBack.drawable,
                     resources.getColor(R.color.colorWhite, null)
                 )
             } else {
-                mBinding.constraintBottomSheetTop.setBackgroundColor(resources.getColor(R.color.colorPrimary))
+                constraintBottomSheetTop.setBackgroundColor(resources.getColor(R.color.colorPrimary))
                 DrawableCompat.setTint(
-                    mBinding.imageViewBack.drawable,
+                    imageViewBack.drawable,
                     resources.getColor(R.color.colorWhite)
                 )
             }
@@ -787,7 +823,7 @@ class Picker : AppCompatActivity() {
 
         if (statusBarSize > 0) {
             val params =
-                mBinding.constraintBottomSheetTop.layoutParams as ConstraintLayout.LayoutParams
+                constraintBottomSheetTop.layoutParams as ConstraintLayout.LayoutParams
             params.setMargins(0, statusBarSize, 0, 0)
         }
         hideStatusBar(this)
@@ -822,24 +858,24 @@ class Picker : AppCompatActivity() {
         for (i in 0 until galleryImageList.size) galleryImageList[i].isSelected = false
         mInstantMediaAdapter?.notifyDataSetChanged()
         mBottomMediaAdapter?.notifyDataSetChanged()
-        mBinding.constraintCheck.visibility = GONE
-        mBinding.textViewOk.visibility = GONE
-        mBinding.imageViewCheck.visibility = VISIBLE
+        constraintCheck.visibility = GONE
+        textViewOk.visibility = GONE
+        imageViewCheck.visibility = VISIBLE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            mBinding.constraintBottomSheetTop.setBackgroundColor(
+            constraintBottomSheetTop.setBackgroundColor(
                 resources.getColor(
                     R.color.colorWhite,
                     null
                 )
             )
             DrawableCompat.setTint(
-                mBinding.imageViewBack.drawable,
+                imageViewBack.drawable,
                 resources.getColor(R.color.colorBlack, null)
             )
         } else {
-            mBinding.constraintBottomSheetTop.setBackgroundColor(resources.getColor(R.color.colorWhite))
+            constraintBottomSheetTop.setBackgroundColor(resources.getColor(R.color.colorWhite))
             DrawableCompat.setTint(
-                mBinding.imageViewBack.drawable,
+                imageViewBack.drawable,
                 resources.getColor(R.color.colorBlack)
             )
         }

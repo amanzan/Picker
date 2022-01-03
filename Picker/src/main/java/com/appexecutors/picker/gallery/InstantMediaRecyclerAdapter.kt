@@ -3,15 +3,17 @@ package com.appexecutors.picker.gallery
 import android.content.Context
 import android.provider.MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO
 import android.view.LayoutInflater
+import android.view.View
 import android.view.View.GONE
 import android.view.View.VISIBLE
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.Toast
 import android.widget.Toast.LENGTH_SHORT
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.RecyclerView
-import com.appexecutors.picker.databinding.RecyclerItemMediaBinding
+import com.appexecutors.picker.R
 import com.appexecutors.picker.interfaces.MediaClickInterface
 import com.appexecutors.picker.utils.GeneralUtils.convertDpToPixel
 import com.bumptech.glide.Glide
@@ -43,8 +45,7 @@ class InstantMediaRecyclerAdapter(val mMediaList: ArrayList<MediaModel>, val mIn
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MediaViewHolder {
-        val mBinding = RecyclerItemMediaBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-        return MediaViewHolder(mBinding)
+        return MediaViewHolder(LayoutInflater.from(parent.context).inflate(R.layout.recycler_item_media, parent, false))
     }
 
     override fun getItemCount(): Int {
@@ -57,7 +58,10 @@ class InstantMediaRecyclerAdapter(val mMediaList: ArrayList<MediaModel>, val mIn
 
     var imageCount = 0
 
-    inner class MediaViewHolder(private val mBinding: RecyclerItemMediaBinding): RecyclerView.ViewHolder(mBinding.root) {
+    inner class MediaViewHolder(private val itemView: View): RecyclerView.ViewHolder(itemView) {
+        val imageView = itemView.findViewById<ImageView>(R.id.image_view)
+        val imageViewVideo = itemView.findViewById<ImageView>(R.id.image_view_video)
+        val imageViewSelection = itemView.findViewById<ImageView>(R.id.image_view_selection)
 
         fun bind(position: Int){
             val media = mMediaList[position]
@@ -78,13 +82,13 @@ class InstantMediaRecyclerAdapter(val mMediaList: ArrayList<MediaModel>, val mIn
 
                 glide?.load(media.mMediaUri)
                     ?.apply(options)
-                    ?.into(mBinding.imageView)
+                    ?.into(imageView)
 
-                if (media.mMediaType == MEDIA_TYPE_VIDEO) mBinding.imageViewVideo.visibility = VISIBLE
-                else mBinding.imageViewVideo.visibility = GONE
+                if (media.mMediaType == MEDIA_TYPE_VIDEO) imageViewVideo.visibility = VISIBLE
+                else imageViewVideo.visibility = GONE
 
-                if (media.isSelected) mBinding.imageViewSelection.visibility = VISIBLE
-                else mBinding.imageViewSelection.visibility = GONE
+                if (media.isSelected) imageViewSelection.visibility = VISIBLE
+                else imageViewSelection.visibility = GONE
 
                 itemView.setOnClickListener {
                     if (imageCount == 0) {
